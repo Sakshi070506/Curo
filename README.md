@@ -1,9 +1,9 @@
-# 🩺 MediKiosk — AI-Powered Patient Case-Taking Software
+# 🩺 Curo — AI-Powered Patient Case-Taking Software
 
 **SIH Problem Statement:** Patient Case-Taking Software
 **Theme:** MedTech / BioTech / HealthTech
 
-MediKiosk is a patient-facing software platform that conducts a structured **clinical
+Curo is a patient-facing software platform that conducts a structured **clinical
 history interview** (voice + touch), **digitizes prior medical documents** (OCR), and
 generates a **physician-ready case summary** — all before the patient enters the
 consultation room. It integrates with the **ABDM (ABHA)** ecosystem and hospital
