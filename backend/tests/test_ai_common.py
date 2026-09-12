@@ -61,6 +61,7 @@ class TestPrompts:
             "extract_entities",
             "extract_document_entities",
             "classify_redflag",
+            "classify_intent",
         }
         assert set(PROMPT_TASKS.keys()) == expected
 

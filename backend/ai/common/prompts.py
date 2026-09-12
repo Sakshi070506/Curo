@@ -137,6 +137,19 @@ PROMPT_TASKS: dict[str, PromptSpec] = {
             "recommended_action": "string",
         },
     ),
+    "classify_intent": PromptSpec(
+        task="classify_intent",
+        version="1.0.0",
+        system=(
+            "Classify the patient's utterance into a clinical intent category. "
+            "Output ONLY valid JSON."
+        ),
+        user_template="Patient utterance: {utterance}\nLanguage: {lang}\n\nClassify intent.",
+        output_schema={
+            "intent": "string",  # symptom_report | general_query | clarification | affirmation | negation | dont_know
+            "confidence": "float",
+        },
+    ),
 }
 
 

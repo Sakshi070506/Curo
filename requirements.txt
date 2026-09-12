@@ -13,4 +13,6 @@ pytesseract==0.3.10
 opencv-python-headless==4.9.0.80
 Pillow==10.3.0
 numpy==1.26.4
+sentence-transformers==3.0.1
 pytest==8.2.0
+pytest-asyncio==1.4.0
