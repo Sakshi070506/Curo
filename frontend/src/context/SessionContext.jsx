@@ -86,7 +86,7 @@ function sessionReducer(state, action) {
   }
 }
 
-export function SessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({ children }) {
   const [state, dispatch] = useReducer(sessionReducer, initialState, (saved) => {
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY)
