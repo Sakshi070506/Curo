@@ -1,0 +1,74 @@
+[project]
+name = "curo"
+version = "0.1.0"
+description = "AI-Powered Patient Case-Taking Software"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.111.0",
+    "uvicorn[standard]==0.30.0",
+    "sqlalchemy==2.0.30",
+    "psycopg2-binary==2.9.9",
+    "pgvector==0.2.5",
+    "pydantic==2.7.1",
+    "pydantic-settings==2.2.1",
+    "python-multipart==0.0.9",
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==1.7.4",
+    "httpx==0.27.0",
+    "pytesseract==0.3.10",
+    "opencv-python-headless==4.9.0.80",
+    "Pillow==10.3.0",
+    "numpy==1.26.4",
+    "sentence-transformers==3.0.1",
+    "python-dotenv==1.2.3",
+    "cryptography==42.0.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.2.0",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.4.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = [
+    "E", "F", "I", "W", "UP", "B", "C4", "SIM", "T20", "PTH", "ERA", "PD", "PL", "TRY", "NPY", "PIE", "TID", "RSE", "RET", "FLY",
+]
+ignore = [
+    "E501",
+    "B008",
+    "C901",
+    "T201",
+    "PTH118",
+    "PTH123",
+    "SIM103",
+    "PD011",
+    "RUF012",
+]
+exclude = [
+    ".venv", "venv", "__pycache__", ".git", "node_modules", "dist", "build",
+    "backend/requirements.txt", "frontend/node_modules",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = true

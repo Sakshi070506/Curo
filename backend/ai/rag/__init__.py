@@ -5,8 +5,8 @@ Purpose  : Clinical knowledge retrieval exports.
 """
 
 from .embedding import EmbeddingConfig, EmbeddingModel, MockEmbeddingModel, get_embedding_model
-from .retrieval import Concept, ClinicalRetriever, load_concepts_from_ontology
 from .interaction_checker import DrugInteraction, InteractionChecker, check_interactions
+from .retrieval import ClinicalRetriever, Concept, load_concepts_from_ontology
 
 __all__ = [
     "EmbeddingConfig",

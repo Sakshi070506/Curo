@@ -6,7 +6,6 @@ Purpose  : Extracts diagnoses/drugs/lab values from OCR text.
 
 import re
 from dataclasses import dataclass
-from typing import Any
 
 from backend.ai.common import MockLLMClient, get_prompt, parse_llm_json
 

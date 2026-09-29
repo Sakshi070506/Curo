@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from database.schemas import HealthResponse
+from backend.database.schemas import HealthResponse
 
 router = APIRouter(prefix="/api", tags=["health"])
 

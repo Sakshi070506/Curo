@@ -3,15 +3,15 @@ Tests for backend.ai.rag module.
 """
 
 import pytest
+
 from backend.ai.rag import (
-    EmbeddingConfig,
-    MockEmbeddingModel,
-    Concept,
     ClinicalRetriever,
-    load_concepts_from_ontology,
-    DrugInteraction,
+    Concept,
+    EmbeddingConfig,
     InteractionChecker,
+    MockEmbeddingModel,
     check_interactions,
+    load_concepts_from_ontology,
 )
 
 

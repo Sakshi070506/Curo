@@ -42,7 +42,6 @@ class TesseractExtractor(BaseOCRExtractor):
             pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_CMD")
 
     def extract(self, image: "np.ndarray", lang: str = "hin+eng") -> OCRResult:
-        import numpy as np
 
         pytesseract = _get_pytesseract()
 

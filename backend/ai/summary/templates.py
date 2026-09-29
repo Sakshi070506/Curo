@@ -6,7 +6,6 @@ Purpose  : Standard clinical format templates (EN/HI).
 
 from typing import Any
 
-
 SECTIONS = [
     "chief_complaint",
     "hpi",

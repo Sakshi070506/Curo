@@ -6,17 +6,15 @@ Purpose  : Upload & digitize prior medical documents.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, UploadFile, status
 
-from database.schemas import DocumentTimelineOut, ParsedDocumentOut
-from dependencies import get_ocr_service
+from backend.api.stores import document_store
+from backend.database.schemas import DocumentTimelineOut, ParsedDocumentOut
+from backend.dependencies import get_ocr_service
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
-
-# In-memory per-patient document store (for demo without DB)
-_document_store: Dict[str, List[Dict]] = {}
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
@@ -26,9 +24,11 @@ async def upload_document(file: UploadFile = File(...), patient_id: str = "anony
     content = await file.read()
     result = svc.process_document(content)
     doc_out = result.__dict__
-    if patient_id not in _document_store:
-        _document_store[patient_id] = []
-    _document_store[patient_id].append(doc_out)
+    doc_out["document_id"] = str(uuid.uuid4())
+    doc_out["patient_id"] = patient_id
+    if patient_id not in document_store:
+        document_store[patient_id] = []
+    document_store[patient_id].append(doc_out)
     return doc_out
 
 
@@ -41,16 +41,20 @@ async def extract_document(file: UploadFile = File(...)):
     return result.__dict__
 
 
-@router.get("/{patient_id}/timeline", response_model=List[DocumentTimelineOut])
+@router.get("/{patient_id}/timeline", response_model=list[DocumentTimelineOut])
 def get_timeline(patient_id: str):
-    docs = _document_store.get(patient_id, [])
+    docs = document_store.get(patient_id, [])
+    # Sort chronologically by date
+    ordered = sorted(docs, key=lambda d: d.get("date") or "0000-00-00")
     return [
         {
+            "document_id": d.get("document_id", ""),
             "type": d["document_type"],
             "date": d["date"],
             "diagnoses": d["diagnoses"],
             "medications": d["medications"],
             "investigations": d["investigations"],
+            "procedures": d.get("procedures", []),
         }
-        for d in docs
+        for d in ordered
     ]

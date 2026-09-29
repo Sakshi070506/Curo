@@ -21,7 +21,6 @@ import os
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 try:
     import httpx
@@ -37,11 +36,11 @@ def _new_resource_id() -> str:
     return str(uuid.uuid4())
 
 
-def build_patient_resource(patient: Dict) -> Dict:
+def build_patient_resource(patient: dict) -> dict:
     """patient: {"id", "name", "abha_id", "gender", "dob"}"""
     if not patient.get("id"):
         raise FHIRMappingError("patient.id is required")
-    resource: Dict = {
+    resource: dict = {
         "resourceType": "Patient",
         "id": patient["id"],
         "identifier": [{"system": "https://healthid.ndhm.gov.in", "value": patient.get("abha_id", "")}],
@@ -54,7 +53,7 @@ def build_patient_resource(patient: Dict) -> Dict:
     return resource
 
 
-def build_condition_resources(patient_id: str, diagnoses: List[str]) -> List[Dict]:
+def build_condition_resources(patient_id: str, diagnoses: list[str]) -> list[dict]:
     resources = []
     for diagnosis in diagnoses:
         if not diagnosis:
@@ -69,7 +68,7 @@ def build_condition_resources(patient_id: str, diagnoses: List[str]) -> List[Dic
     return resources
 
 
-def build_medication_statement_resources(patient_id: str, medications: List[Dict]) -> List[Dict]:
+def build_medication_statement_resources(patient_id: str, medications: list[dict]) -> list[dict]:
     """medications: [{"name", "dosage", "frequency"}]"""
     resources = []
     for med in medications:
@@ -86,13 +85,13 @@ def build_medication_statement_resources(patient_id: str, medications: List[Dict
     return resources
 
 
-def build_observation_resources(patient_id: str, investigations: List[Dict]) -> List[Dict]:
+def build_observation_resources(patient_id: str, investigations: list[dict]) -> list[dict]:
     """investigations: [{"test", "value", "unit", "ref_range", "abnormal"}]"""
     resources = []
     for inv in investigations:
         if not inv.get("test"):
             continue
-        resource: Dict = {
+        resource: dict = {
             "resourceType": "Observation",
             "id": _new_resource_id(),
             "subject": {"reference": f"Patient/{patient_id}"},
@@ -109,7 +108,7 @@ def build_observation_resources(patient_id: str, investigations: List[Dict]) -> 
     return resources
 
 
-def build_fhir_bundle(summary: Dict) -> Dict:
+def build_fhir_bundle(summary: dict) -> dict:
     """summary: the confirmed case-summary schema produced by Module C, e.g.:
     {
       "patient": {"id": "p123", "name": "...", "abha_id": "...", "gender": "male", "dob": "1990-01-01"},
@@ -142,20 +141,63 @@ def build_fhir_bundle(summary: Dict) -> Dict:
     }
 
 
+def summary_to_fhir_input(summary: dict, patient: dict) -> dict:
+    """
+    Convert a Module C structured summary to FHIR bundle input format.
+    This is the AGENTS.md §3 contract function: Summary/LLM Engineer ↔ Integration Engineer.
+
+    Args:
+        summary: Module C summary with all clinical sections
+        patient: Patient demographics {id, name, abha_id, gender, dob}
+
+    Returns:
+        Flat dict compatible with build_fhir_bundle() / FHIRPushRequest
+    """
+    # Map past_medical_history + family_history + prior_investigations to diagnoses
+    all_diagnoses = list(summary.get("diagnoses", []))
+    if summary.get("chief_complaint"):
+        all_diagnoses = [summary["chief_complaint"]] + all_diagnoses
+
+    # Add past medical history as additional diagnoses
+    all_diagnoses.extend(summary.get("past_medical_history", []))
+
+    # Build medications list from drug_allergy_history + medications
+    # drug_allergy_history contains drug names (may include allergies)
+    # medications contains structured med objects
+    all_medications = list(summary.get("medications", []))
+    for drug_name in summary.get("drug_allergy_history", []):
+        if drug_name and drug_name != "not mentioned":
+            # Check if already in medications
+            if not any(m.get("name", "").lower() == drug_name.lower() for m in all_medications):
+                all_medications.append({"name": drug_name, "dosage": "", "frequency": ""})
+
+    # Build investigations from prior_investigations + investigations
+    all_investigations = list(summary.get("prior_investigations", []))
+    all_investigations.extend(summary.get("investigations", []))
+
+    return {
+        "patient": patient,
+        "chief_complaint": summary.get("chief_complaint"),
+        "diagnoses": all_diagnoses,
+        "medications": all_medications,
+        "investigations": all_investigations,
+    }
+
+
 @dataclass
 class ABDMPushResult:
     success: bool
-    status_code: Optional[int]
+    status_code: int | None
     dry_run: bool
     message: str
     latency_ms: float
 
 
 def push_to_abdm(
-    bundle: Dict,
-    client_id: Optional[str] = None,
-    client_secret: Optional[str] = None,
-    base_url: Optional[str] = None,
+    bundle: dict,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    base_url: str | None = None,
 ) -> ABDMPushResult:
     client_id = client_id or os.getenv("ABDM_CLIENT_ID")
     client_secret = client_secret or os.getenv("ABDM_CLIENT_SECRET")

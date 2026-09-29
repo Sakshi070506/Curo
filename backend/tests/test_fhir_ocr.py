@@ -1,7 +1,7 @@
 import pytest
-from services.fhir_service import build_fhir_bundle, push_to_abdm, FHIRMappingError
-from services.ocr_service import OCRService, MockExtractor, RuleBasedParser
 
+from backend.services.fhir_service import FHIRMappingError, build_fhir_bundle, push_to_abdm
+from backend.services.ocr_service import MockExtractor, OCRService, RuleBasedParser
 
 # ---------------------------------------------------------------------------
 # FHIR
@@ -104,8 +104,8 @@ def test_ocr_service_with_real_tesseract_if_available():
     available (as they are in this environment), the DEFAULT extractor should be
     TesseractExtractor and should manage to read simple rendered text."""
     try:
-        from PIL import Image, ImageDraw
         import pytesseract  # noqa: F401
+        from PIL import Image, ImageDraw
     except ImportError:
         pytest.skip("Pillow/pytesseract not installed in this environment")
 

@@ -3,15 +3,16 @@ Tests for backend.ai.common shared AI layer.
 """
 
 import pytest
+
 from backend.ai.common import (
+    PROMPT_TASKS,
+    LLMConfig,
+    MockLLMClient,
     clean_text,
     detect_language,
-    parse_llm_json,
     get_prompt,
+    parse_llm_json,
     render,
-    PROMPT_TASKS,
-    MockLLMClient,
-    LLMConfig,
 )
 
 

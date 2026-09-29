@@ -3,20 +3,21 @@ Tests for backend.ai.summary module.
 """
 
 import pytest
+
 from backend.ai.summary import (
-    SECTIONS,
-    SECTION_LABELS_EN,
-    SECTION_LABELS_HI,
-    HPI_SUBSECTIONS,
     HPI_LABELS_EN,
     HPI_LABELS_HI,
-    render_template,
-    render_patient_audio,
-    validate_summary_structure,
+    HPI_SUBSECTIONS,
+    SECTION_LABELS_EN,
+    SECTION_LABELS_HI,
+    SECTIONS,
     SummaryResult,
-    synthesize_sync,
     confirm,
     edit,
+    render_patient_audio,
+    render_template,
+    synthesize_sync,
+    validate_summary_structure,
 )
 
 

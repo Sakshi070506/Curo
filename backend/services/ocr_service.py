@@ -21,7 +21,7 @@ import io
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Protocol
+from typing import Protocol
 
 try:
     from PIL import Image, ImageOps
@@ -42,11 +42,11 @@ class Preprocessor(Protocol):
 
 
 class Extractor(Protocol):
-    def extract_text(self, image_bytes: bytes, language_hint: str = "eng") -> "ExtractionResult": ...
+    def extract_text(self, image_bytes: bytes, language_hint: str = "eng") -> ExtractionResult: ...
 
 
 class Parser(Protocol):
-    def parse(self, text: str) -> "ParsedDocument": ...
+    def parse(self, text: str) -> ParsedDocument: ...
 
 
 @dataclass
@@ -58,11 +58,14 @@ class ExtractionResult:
 @dataclass
 class ParsedDocument:
     document_type: str
-    date: Optional[str]
-    diagnoses: List[str] = field(default_factory=list)
-    medications: List[Dict] = field(default_factory=list)
-    investigations: List[Dict] = field(default_factory=list)
+    date: str | None
+    diagnoses: list[str] = field(default_factory=list)
+    medications: list[dict] = field(default_factory=list)
+    investigations: list[dict] = field(default_factory=list)
+    procedures: list[str] = field(default_factory=list)
+    dates: list[str] = field(default_factory=list)
     raw_text: str = ""
+    raw_ocr_confidence: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +154,8 @@ class RuleBasedParser:
             diagnoses=self._extract_diagnoses(text),
             medications=self._extract_medications(text),
             investigations=self._extract_investigations(text),
+            procedures=self._extract_procedures(text),
+            dates=self._extract_dates(text),
             raw_text=text,
         )
 
@@ -164,7 +169,7 @@ class RuleBasedParser:
         return "prescription"
 
     @staticmethod
-    def _extract_date(text: str) -> Optional[str]:
+    def _extract_date(text: str) -> str | None:
         match = DATE_PATTERN.search(text)
         if not match:
             return None
@@ -177,15 +182,24 @@ class RuleBasedParser:
             return None
 
     @staticmethod
-    def _extract_medications(text: str) -> List[Dict]:
+    def _extract_medications(text: str) -> list[dict]:
         results = []
         for match in MED_PATTERN.finditer(text):
             name, dosage, frequency = match.groups()
-            results.append({"name": name, "dosage": dosage, "frequency": frequency or ""})
+            # Extract duration if present nearby
+            duration = "ongoing"
+            # Look for duration patterns after the medication
+            text_after = text[match.end():match.end()+50]
+            import re
+            dur_pattern = r"for\s+(\d+\s*(?:days?|weeks?|months?))"
+            dur_match = re.search(dur_pattern, text_after, re.IGNORECASE)
+            if dur_match:
+                duration = dur_match.group(1)
+            results.append({"name": name, "dosage": dosage, "frequency": frequency or "", "duration": duration})
         return results
 
     @staticmethod
-    def _extract_investigations(text: str) -> List[Dict]:
+    def _extract_investigations(text: str) -> list[dict]:
         results = []
         for match in LAB_VALUE_PATTERN.finditer(text):
             test, value, unit, ref_range = match.groups()
@@ -209,13 +223,40 @@ class RuleBasedParser:
         return results
 
     @staticmethod
-    def _extract_diagnoses(text: str) -> List[str]:
+    def _extract_diagnoses(text: str) -> list[str]:
         diagnoses = []
         for line in text.splitlines():
             lowered = line.lower().strip()
             if lowered.startswith("dx:") or lowered.startswith("diagnosis:"):
                 diagnoses.append(line.split(":", 1)[1].strip())
         return diagnoses
+
+    @staticmethod
+    def _extract_procedures(text: str) -> list[str]:
+        procedures = []
+        proc_keywords = [
+            "surgery", "operation", "appendectomy", "cholecystectomy", "hernia repair",
+            "cataract", "angioplasty", "bypass", "dialysis", "biopsy", "endoscopy",
+            "colonoscopy", "ecg", "echo", "x-ray", "ct scan", "mri", "ultrasound",
+        ]
+        text_lower = text.lower()
+        for kw in proc_keywords:
+            if kw in text_lower:
+                procedures.append(kw.title())
+        return list(set(procedures))
+
+    @staticmethod
+    def _extract_dates(text: str) -> list[str]:
+        dates = []
+        for match in DATE_PATTERN.finditer(text):
+            day, month, year = match.groups()
+            if len(year) == 2:
+                year = "20" + year
+            try:
+                dates.append(f"{year}-{int(month):02d}-{int(day):02d}")
+            except ValueError:
+                pass
+        return dates
 
 
 # ---------------------------------------------------------------------------
@@ -224,9 +265,9 @@ class RuleBasedParser:
 class OCRService:
     def __init__(
         self,
-        preprocessor: Optional[Preprocessor] = None,
-        extractor: Optional[Extractor] = None,
-        parser: Optional[Parser] = None,
+        preprocessor: Preprocessor | None = None,
+        extractor: Extractor | None = None,
+        parser: Parser | None = None,
     ):
         self.preprocessor = preprocessor or DefaultPreprocessor()
         self.extractor = extractor or self._default_extractor()
@@ -241,9 +282,11 @@ class OCRService:
     def process_document(self, image_bytes: bytes, language_hint: str = "eng") -> ParsedDocument:
         preprocessed = self.preprocessor.process(image_bytes)
         extraction = self.extractor.extract_text(preprocessed, language_hint)
-        return self.parser.parse(extraction.text)
+        parsed = self.parser.parse(extraction.text)
+        parsed.raw_ocr_confidence = extraction.confidence
+        return parsed
 
-    def process_multi_page(self, pages: List[bytes], language_hint: str = "eng") -> ParsedDocument:
+    def process_multi_page(self, pages: list[bytes], language_hint: str = "eng") -> ParsedDocument:
         """Combine OCR text from multiple pages before parsing, so entities that
         span a page break (e.g. a lab table) still get extracted correctly."""
         combined_text = []
@@ -254,7 +297,7 @@ class OCRService:
         return self.parser.parse("\n".join(combined_text))
 
     @staticmethod
-    def build_timeline(parsed_documents: List[ParsedDocument]) -> List[Dict]:
+    def build_timeline(parsed_documents: list[ParsedDocument]) -> list[dict]:
         """Sort parsed documents chronologically for the patient timeline
         (docs/module-B-document-digitization.md: 'Chronological organization')."""
         ordered = sorted(parsed_documents, key=lambda d: d.date or "0000-00-00")
@@ -272,11 +315,11 @@ class OCRService:
 
 if __name__ == "__main__":
     sample_text = (
-        "Discharge Summary dated 05/08/2026\n"
-        "Dx: Type 2 Diabetes Mellitus\n"
-        "Metformin 500mg BD\n"
-        "HbA1c: 8.2 % (ref 4.0-5.6)\n"
-    ).encode("utf-8")
+        b"Discharge Summary dated 05/08/2026\n"
+        b"Dx: Type 2 Diabetes Mellitus\n"
+        b"Metformin 500mg BD\n"
+        b"HbA1c: 8.2 % (ref 4.0-5.6)\n"
+    )
 
     service = OCRService(extractor=MockExtractor())
     result = service.process_document(sample_text)

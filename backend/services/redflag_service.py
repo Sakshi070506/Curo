@@ -17,8 +17,9 @@ Design notes
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List
+from datetime import datetime
 
 
 @dataclass
@@ -27,7 +28,7 @@ class RedFlagRule:
     description: str
     # List of keyword groups. ALL groups must match (AND-of-groups); a group
     # matches if ANY of its keywords is present (OR-within-group).
-    required_any: List[List[str]]
+    required_any: list[list[str]]
     severity: str  # "critical" | "high"
 
     def matches(self, text: str) -> bool:
@@ -38,7 +39,7 @@ class RedFlagRule:
         return True
 
 
-RED_FLAG_RULES: List[RedFlagRule] = [
+RED_FLAG_RULES: list[RedFlagRule] = [
     RedFlagRule(
         id="acute_coronary_syndrome",
         description="Chest pain with breathlessness — possible cardiac event",
@@ -107,7 +108,7 @@ _SEVERITY_ORDER = {"none": 0, "high": 1, "critical": 2}
 @dataclass
 class RedFlagResult:
     triggered: bool
-    matched_rules: List[Dict[str, str]] = field(default_factory=list)
+    matched_rules: list[dict[str, str]] = field(default_factory=list)
     highest_severity: str = "none"
 
 
@@ -119,7 +120,7 @@ class RedFlagDetector:
         if not text or not text.strip():
             return RedFlagResult(triggered=False)
 
-        matched: List[Dict[str, str]] = []
+        matched: list[dict[str, str]] = []
         highest = "none"
         for rule in self.rules:
             if rule.matches(text):
@@ -129,22 +130,30 @@ class RedFlagDetector:
 
         return RedFlagResult(triggered=bool(matched), matched_rules=matched, highest_severity=highest)
 
-    def check_session_answers(self, answers: List[str]) -> RedFlagResult:
+    def check_session_answers(self, answers: list[str]) -> RedFlagResult:
         """Check the running interview transcript so a rule can span multiple turns."""
         combined = " . ".join(a for a in answers if a)
         return self.check(combined)
 
 
-def build_triage_alert_payload(patient_id: str, session_id: str, red_flag: RedFlagResult) -> Dict:
+def build_triage_alert_payload(patient_id: str, session_id: str, red_flag: RedFlagResult) -> dict:
     """Payload shape agreed in AGENTS.md §3 ('Red-flag event payload' contract,
     Conversation AI Engineer <-> Backend Engineer). Feed this straight into
     NotificationService.push_triage_alert(**payload) or POST /api/triage/alert."""
+    # Extract primary symptom from matched rules
+    symptom = ""
+    if red_flag.matched_rules:
+        symptom = red_flag.matched_rules[0].get("description", "")
+
     return {
         "patient_id": patient_id,
         "session_id": session_id,
         "severity": red_flag.highest_severity,
         "matched_rules": red_flag.matched_rules,
         "requires_immediate_attention": red_flag.highest_severity == "critical",
+        # AGENTS.md §3 contract fields
+        "symptom": symptom,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 
 

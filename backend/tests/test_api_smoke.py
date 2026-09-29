@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 
 def test_app_boots():
-    from main import app
+    from backend.main import app
     client = TestClient(app)
     resp = client.get("/api/health")
     assert resp.status_code == 200
@@ -11,7 +11,7 @@ def test_app_boots():
 
 
 def test_start_session():
-    from main import app
+    from backend.main import app
     client = TestClient(app)
     resp = client.post("/api/history/start-session", json={"language": "en", "ayush_mode": False})
     assert resp.status_code == 201
@@ -21,7 +21,7 @@ def test_start_session():
 
 
 def test_answer_flow():
-    from main import app
+    from backend.main import app
     client = TestClient(app)
     start = client.post("/api/history/start-session", json={"language": "en", "ayush_mode": False}).json()
     sid = start["session_id"]
@@ -39,7 +39,7 @@ def test_answer_flow():
 
 
 def test_redflag_check_endpoint():
-    from main import app
+    from backend.main import app
     client = TestClient(app)
     resp = client.post("/api/history/redflag-check", json={"text": "chest pain and breathless"})
     assert resp.status_code == 200
@@ -49,7 +49,7 @@ def test_redflag_check_endpoint():
 
 
 def test_triage_alert_and_queue():
-    from main import app
+    from backend.main import app
     client = TestClient(app)
     # Push alert
     resp = client.post("/api/triage/alert", json={
@@ -67,11 +67,11 @@ def test_triage_alert_and_queue():
     resp = client.get("/api/triage/queue")
     assert resp.status_code == 200
     queue = resp.json()
-    assert len(queue) >= 1
+    assert len(queue["alerts"]) >= 1
 
 
 def test_document_extract():
-    from main import app
+    from backend.main import app
     client = TestClient(app)
     # Use mock extractor - the OCRService defaults to MockExtractor when tesseract not available
     resp = client.post(
@@ -85,7 +85,7 @@ def test_document_extract():
 
 
 def test_fhir_push_dry_run():
-    from main import app
+    from backend.main import app
     client = TestClient(app)
     resp = client.post("/api/abdm/push-fhir", json={
         "patient": {"id": "p123", "name": "Test Patient", "abha_id": "12-3456-7890-1234", "gender": "male", "dob": "1990-01-01"},

@@ -19,7 +19,7 @@ import hashlib
 import os
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Protocol
+from typing import Protocol
 
 try:
     import httpx
@@ -44,7 +44,7 @@ class TTSProvider(Protocol):
 class BhashiniTTSProvider:
     """Real TTS provider — calls the Bhashini / AI4Bharat inference API."""
 
-    def __init__(self, api_key: Optional[str] = None, api_url: Optional[str] = None, timeout: float = 15.0):
+    def __init__(self, api_key: str | None = None, api_url: str | None = None, timeout: float = 15.0):
         self.api_key = api_key or os.getenv("BHASHINI_API_KEY")
         self.api_url = api_url or os.getenv("BHASHINI_API_URL")
         self.timeout = timeout
@@ -79,16 +79,16 @@ class MockTTSProvider:
     def synthesize(self, text: str, language_code: str) -> bytes:
         if not text.strip():
             raise ValueError("text must not be empty")
-        return f"MOCK_AUDIO::{language_code}::{text}".encode("utf-8")
+        return f"MOCK_AUDIO::{language_code}::{text}".encode()
 
 
 class TTSService:
     """Facade with an in-memory cache keyed on (text, language)."""
 
-    def __init__(self, provider: Optional[TTSProvider] = None, cache_size: int = 256):
+    def __init__(self, provider: TTSProvider | None = None, cache_size: int = 256):
         self.provider = provider or self._default_provider()
         self.cache_size = cache_size
-        self._cache: Dict[str, TTSResult] = {}
+        self._cache: dict[str, TTSResult] = {}
 
     @staticmethod
     def _default_provider() -> TTSProvider:

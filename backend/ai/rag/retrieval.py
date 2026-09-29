@@ -5,7 +5,6 @@ Purpose  : Vector search over clinical knowledge base.
 """
 
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
@@ -49,7 +48,7 @@ class ClinicalRetriever:
         texts = [f"{c.name} {c.description}".strip() for c in self.concepts]
         embeddings = self.embedding_model.embed_texts(texts)
 
-        for concept, emb in zip(self.concepts, embeddings):
+        for concept, emb in zip(self.concepts, embeddings, strict=False):
             concept.embedding = emb
 
         self._embeddings_matrix = np.array(embeddings, dtype=np.float32)

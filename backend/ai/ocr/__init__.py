@@ -4,9 +4,16 @@ Owner    : Document AI Engineer
 Purpose  : OCR pipeline exports.
 """
 
-from .preprocessor import preprocess, preprocess_pipeline, PreprocessLevel
-from .extractor import OCRResult, BaseOCRExtractor, TesseractExtractor, VisionAPIExtractor, get_extractor, extract_text
+from .extractor import (
+    BaseOCRExtractor,
+    OCRResult,
+    TesseractExtractor,
+    VisionAPIExtractor,
+    extract_text,
+    get_extractor,
+)
 from .parser import ParsedDocument, parse_document, parse_document_sync
+from .preprocessor import PreprocessLevel, preprocess, preprocess_pipeline
 
 __all__ = [
     "preprocess",
