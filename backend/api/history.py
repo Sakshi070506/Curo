@@ -8,11 +8,9 @@ from __future__ import annotations
 
 import base64
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import ValidationError
+from fastapi import APIRouter, HTTPException, status
 
-from config import settings
-from database.schemas import (
+from backend.database.schemas import (
     AnswerRequest,
     AnswerResponse,
     HistorySessionOut,
@@ -21,13 +19,13 @@ from database.schemas import (
     StartSessionRequest,
     StartSessionResponse,
 )
-from dependencies import (
+from backend.dependencies import (
     get_asr_service,
     get_dialogue_manager,
     get_notification_service,
     get_redflag_detector,
 )
-from services.redflag_service import build_triage_alert_payload
+from backend.services.redflag_service import RedFlagResult, build_triage_alert_payload
 
 router = APIRouter(prefix="/api/history", tags=["history"])
 
@@ -64,18 +62,9 @@ def submit_answer(req: AnswerRequest):
     # If red flag triggered, push to triage immediately (per Module A contract)
     if turn["red_flag"]["triggered"]:
         session = dm.get_session(req.session_id)
+        # Use the session's patient_id if available, else derive from session_id
+        patient_id = getattr(session, "patient_id", None) or f"session_{req.session_id[:8]}"
         try:
-            # We need a patient_id - for now derive from session or use placeholder
-            # In real flow, session would be linked to a patient
-            patient_id = getattr(session, "patient_id", f"session_{req.session_id[:8]}")
-            payload = build_triage_alert_payload(
-                patient_id=patient_id,
-                session_id=req.session_id,
-                red_flag=type("obj", (object,), turn["red_flag"])()  # duck-type RedFlagResult
-            )
-            # The build_triage_alert_payload expects a RedFlagResult with matched_rules/highest_severity
-            # Create a minimal object matching the expected interface
-            from services.redflag_service import RedFlagResult
             rf_result = RedFlagResult(
                 triggered=turn["red_flag"]["triggered"],
                 matched_rules=turn["red_flag"]["matched_rules"],
@@ -91,10 +80,13 @@ def submit_answer(req: AnswerRequest):
                 session_id=payload["session_id"],
                 severity=payload["severity"],
                 matched_rules=payload["matched_rules"],
+                requires_immediate_attention=payload["requires_immediate_attention"],
+                symptom=payload["symptom"],
+                timestamp=payload["timestamp"],
             )
-        except Exception:
-            # Don't fail the interview if triage push fails
-            pass
+        except Exception as exc:
+            # Log but don't fail the interview if triage push fails
+            print(f"[triage] Failed to push alert: {exc}")
 
     return turn
 

@@ -1,6 +1,12 @@
 import pytest
-from services.asr_service import ASRService, MockASRProvider, UnsupportedLanguageError
-from services.tts_service import TTSService, MockTTSProvider, preload_common_prompts, COMMON_PROMPTS
+
+from backend.services.asr_service import ASRService, MockASRProvider, UnsupportedLanguageError
+from backend.services.tts_service import (
+    COMMON_PROMPTS,
+    MockTTSProvider,
+    TTSService,
+    preload_common_prompts,
+)
 
 
 # ---------------------------------------------------------------------------

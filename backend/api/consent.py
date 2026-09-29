@@ -6,40 +6,70 @@ Purpose  : Consent capture + FHIR push to HIS/ABDM.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from config import settings
-from database.schemas import ABDMStatusResponse, ConsentGrantRequest, ConsentGrantResponse, FHIRPushRequest, FHIRPushResponse
-from dependencies import get_ocr_service, get_tts_service
-from services.fhir_service import ABDMPushResult, build_fhir_bundle, push_to_abdm
+from backend.api.stores import abdm_status, consent_store
+from backend.config import settings
+from backend.database.schemas import (
+    ABDMStatusResponse,
+    ConsentGrantRequest,
+    ConsentGrantResponse,
+    ConsentStatusResponse,
+    FHIRPushRequest,
+    FHIRPushResponse,
+)
+from backend.dependencies import require_auth
+from backend.services.fhir_service import build_fhir_bundle, push_to_abdm
 
 router = APIRouter(prefix="/api", tags=["consent", "abdm"])
 
-# In-memory consent store and ABDM push status (for demo without DB)
-_consent_store: Dict[str, Dict] = {}
-_abdm_status: Dict[str, Optional[ABDMPushResult]] = {}
-
 
 @router.post("/consent/grant", response_model=ConsentGrantResponse, status_code=status.HTTP_201_CREATED)
-def grant_consent(req: ConsentGrantRequest):
-    import time
-    import uuid
+def grant_consent(req: ConsentGrantRequest, user: dict = Depends(require_auth)):
     consent_id = str(uuid.uuid4())
+    audit_trail_id = str(uuid.uuid4())
+    timestamp = datetime.utcnow().isoformat() + "Z"
+
     record = {
         "consent_id": consent_id,
         "patient_id": req.patient_id,
-        "purposes": req.purposes,
-        "granted": req.granted,
-        "timestamp": time.time(),
+        "data_capture": req.data_capture,
+        "share_with_his": req.share_with_his,
+        "link_abha_phr": req.link_abha_phr,
+        "consent_language": req.consent_language,
+        "timestamp": timestamp,
+        "audit_trail_id": audit_trail_id,
     }
-    _consent_store[consent_id] = record
+    consent_store[consent_id] = record
     return record
 
 
+@router.get("/consent/status/{patient_id}", response_model=ConsentStatusResponse)
+def get_consent_status(patient_id: str):
+    """Get the latest consent status for a patient."""
+    # Find the most recent consent for this patient
+    patient_consents = [c for c in consent_store.values() if c.get("patient_id") == patient_id]
+    if not patient_consents:
+        raise HTTPException(status_code=404, detail="No consent found for patient")
+
+    latest = max(patient_consents, key=lambda c: c.get("timestamp", ""))
+    return latest
+
+
+@router.delete("/consent/revoke/{consent_id}")
+def revoke_consent(consent_id: str):
+    """Revoke a specific consent."""
+    if consent_id not in consent_store:
+        raise HTTPException(status_code=404, detail="Consent not found")
+    del consent_store[consent_id]
+    return {"revoked": True, "consent_id": consent_id}
+
+
 @router.post("/abdm/push-fhir", response_model=FHIRPushResponse)
-def push_fhir(req: FHIRPushRequest):
+def push_fhir(req: FHIRPushRequest, user: dict = Depends(require_auth)):
     """Build FHIR bundle from summary and push to ABDM sandbox."""
     # Merge chief_complaint into diagnoses if provided
     diagnoses = list(req.diagnoses)
@@ -69,7 +99,7 @@ def push_fhir(req: FHIRPushRequest):
 
     # Store last push status for /status endpoint
     patient_id = req.patient.get("id", "unknown")
-    _abdm_status[patient_id] = result
+    abdm_status[patient_id] = result
 
     return {
         "success": result.success,
@@ -81,8 +111,8 @@ def push_fhir(req: FHIRPushRequest):
 
 
 @router.get("/abdm/status/{patient_id}", response_model=ABDMStatusResponse)
-def abdm_status(patient_id: str):
-    last = _abdm_status.get(patient_id)
+def abdm_status_endpoint(patient_id: str):
+    last = abdm_status.get(patient_id)
     if last is None:
         return {
             "patient_id": patient_id,

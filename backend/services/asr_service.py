@@ -19,7 +19,7 @@ import hashlib
 import os
 import time
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Protocol
 
 try:
     import httpx
@@ -66,7 +66,7 @@ class BhashiniASRProvider:
     behavioral contract instead.
     """
 
-    def __init__(self, api_key: Optional[str] = None, api_url: Optional[str] = None, timeout: float = 15.0):
+    def __init__(self, api_key: str | None = None, api_url: str | None = None, timeout: float = 15.0):
         self.api_key = api_key or os.getenv("BHASHINI_API_KEY")
         self.api_url = api_url or os.getenv("BHASHINI_API_URL")
         self.timeout = timeout
@@ -147,7 +147,7 @@ class ASRService:
     path works in prod and in local dev/tests.
     """
 
-    def __init__(self, provider: Optional[ASRProvider] = None):
+    def __init__(self, provider: ASRProvider | None = None):
         self.provider = provider or self._default_provider()
 
     @staticmethod

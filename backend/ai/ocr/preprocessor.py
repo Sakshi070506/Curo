@@ -4,10 +4,10 @@ Owner    : Document AI Engineer
 Purpose  : Deskew, denoise, contrast-normalize scanned docs.
 """
 
-import cv2
-import numpy as np
 from typing import Literal
 
+import cv2
+import numpy as np
 
 PreprocessLevel = Literal["light", "medium", "heavy"]
 

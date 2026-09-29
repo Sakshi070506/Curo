@@ -2,8 +2,8 @@
 Tests for backend.ai.ocr module.
 """
 
-import pytest
 import numpy as np
+import pytest
 
 # Try importing cv2, skip tests if not available
 try:
@@ -21,16 +21,14 @@ except ImportError:
 
 # Import what we can
 from backend.ai.ocr import (
-    preprocess,
-    preprocess_pipeline,
-    PreprocessLevel,
     ParsedDocument,
     parse_document_sync,
+    preprocess,
+    preprocess_pipeline,
 )
 
 if TESSERACT_AVAILABLE:
     from backend.ai.ocr import (
-        OCRResult,
         TesseractExtractor,
         VisionAPIExtractor,
         get_extractor,

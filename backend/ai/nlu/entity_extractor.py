@@ -4,8 +4,7 @@ Owner    : ML Engineer
 Purpose  : Extracts symptoms/onset/duration from free text.
 """
 
-from backend.ai.common import MockLLMClient, get_prompt, parse_llm_json, detect_language
-
+from backend.ai.common import MockLLMClient, detect_language, get_prompt, parse_llm_json
 
 SOCRATES_SLOTS = [
     "site",

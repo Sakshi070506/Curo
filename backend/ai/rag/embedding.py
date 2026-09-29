@@ -16,7 +16,7 @@ try:
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
-from backend.ai.common import LLMClient, LLMConfig, MockLLMClient
+from backend.ai.common import LLMClient, LLMConfig
 
 
 @dataclass

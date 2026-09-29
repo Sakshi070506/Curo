@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from backend.ai.common import MockLLMClient, get_prompt, parse_llm_json
-from .templates import SECTIONS, validate_summary_structure
+
+from .templates import validate_summary_structure
 
 
 @dataclass
@@ -59,10 +60,10 @@ async def synthesize(
     parsed = parse_llm_json(raw_response)
 
     summary = _ensure_all_sections(parsed)
-    
+
     # Merge document data into summary for fields not populated by LLM
     summary = _merge_document_data(summary, document_json)
-    
+
     source_attr = _build_source_attribution(parsed, interview_json, document_json)
     missing = validate_summary_structure(summary)
 
@@ -78,7 +79,7 @@ def _merge_document_data(summary: dict[str, Any], document_json: dict[str, Any])
     documents = document_json.get("documents", [])
     if not documents:
         return summary
-    
+
     for doc in documents:
         # Merge diagnoses into past_medical_history
         if doc.get("diagnoses"):
@@ -86,7 +87,7 @@ def _merge_document_data(summary: dict[str, Any], document_json: dict[str, Any])
             for diag in doc["diagnoses"]:
                 if diag not in existing:
                     summary.setdefault("past_medical_history", []).append(diag)
-        
+
         # Merge medications into drug_allergy_history
         if doc.get("medications"):
             existing = set(summary.get("drug_allergy_history", []))
@@ -94,11 +95,11 @@ def _merge_document_data(summary: dict[str, Any], document_json: dict[str, Any])
                 med_name = med.get("name", "")
                 if med_name and med_name not in existing:
                     summary.setdefault("drug_allergy_history", []).append(med_name)
-        
+
         # Merge investigations into prior_investigations
         if doc.get("investigations"):
             summary.setdefault("prior_investigations", []).extend(doc["investigations"])
-    
+
     return summary
 
 
@@ -222,9 +223,41 @@ def synthesize_sync(
     document_json: dict[str, Any],
     lang: str = "en",
 ) -> SummaryResult:
-    """Synchronous wrapper for synthesize."""
-    import asyncio
-    return asyncio.run(synthesize(interview_json, document_json, lang))
+    """Synchronous wrapper for synthesize - uses MockLLMClient synchronously."""
+    client = MockLLMClient()
+
+    spec = get_prompt("summarize_case")
+
+    interview_str = json.dumps(interview_json, ensure_ascii=False)
+    document_str = json.dumps(document_json, ensure_ascii=False)
+
+    user_prompt = spec.user_template.format(
+        interview_json=interview_str,
+        document_json=document_str,
+    )
+
+    messages = [
+        {"role": "system", "content": spec.system},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    # Use synchronous mock client directly
+    raw_response = client.chat_sync(messages, task="summarize_case")
+    parsed = parse_llm_json(raw_response)
+
+    summary = _ensure_all_sections(parsed)
+
+    # Merge document data into summary for fields not populated by LLM
+    summary = _merge_document_data(summary, document_json)
+
+    source_attr = _build_source_attribution(parsed, interview_json, document_json)
+    missing = validate_summary_structure(summary)
+
+    return SummaryResult(
+        summary=summary,
+        source_attribution=source_attr,
+        missing_sections=missing,
+    )
 
 
 __all__ = [

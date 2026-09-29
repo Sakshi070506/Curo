@@ -6,10 +6,10 @@ Purpose  : Red-flag alert queue for hospital staff.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
-from database.schemas import TriageAlertOut, TriageAlertRequest, TriageQueueResponse
-from dependencies import get_notification_service
+from backend.database.schemas import TriageAlertOut, TriageAlertRequest, TriageQueueResponse
+from backend.dependencies import get_notification_service
 
 router = APIRouter(prefix="/api/triage", tags=["triage"])
 
@@ -22,6 +22,7 @@ def push_alert(req: TriageAlertRequest):
         session_id=req.session_id,
         severity=req.severity,
         matched_rules=req.matched_rules,
+        requires_immediate_attention=req.severity == "critical",
     )
     return {
         "id": alert.id,
@@ -31,7 +32,7 @@ def push_alert(req: TriageAlertRequest):
         "matched_rules": alert.matched_rules,
         "created_at": alert.created_at,
         "acknowledged": alert.acknowledged,
-        "requires_immediate_attention": alert.severity == "critical",
+        "requires_immediate_attention": alert.requires_immediate_attention,
     }
 
 
@@ -49,7 +50,7 @@ def get_queue():
                 "matched_rules": a.matched_rules,
                 "created_at": a.created_at,
                 "acknowledged": a.acknowledged,
-                "requires_immediate_attention": a.severity == "critical",
+                "requires_immediate_attention": a.requires_immediate_attention,
             }
             for a in alerts
         ]

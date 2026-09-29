@@ -9,11 +9,6 @@ START -> LANGUAGE_SELECTED -> CONSENT_GRANTED -> CHIEF_COMPLAINT
       -> HPI_LOOP (SOCRATES) -> PAST_HISTORY -> DRUG_ALLERGY_HISTORY
       -> FAMILY_HISTORY -> PERSONAL_HISTORY -> ROS
       -> (AYUSH_MODE ? DASHAVIDHA_PARIKSHA : skip) -> COMPLETE
-
-Note on imports: uses a relative-then-flat fallback so this file works both as
-part of the `services` package (backend/services/dialogue_manager.py, imported
-via `from .redflag_service import ...`) and as a standalone script sitting next
-to redflag_service.py on sys.path (imported via `from redflag_service import ...`).
 """
 
 from __future__ import annotations
@@ -21,12 +16,8 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
 
-try:
-    from .redflag_service import RedFlagDetector, RedFlagResult
-except ImportError:  # running as a flat script / standalone module
-    from redflag_service import RedFlagDetector, RedFlagResult  # type: ignore
+from backend.services.redflag_service import RedFlagDetector, RedFlagResult
 
 
 class SessionState(str, Enum):
@@ -44,6 +35,8 @@ class SessionState(str, Enum):
     COMPLETE = "COMPLETE"
 
 
+# SOCRATES questions - split exacerbating_relieving into two separate questions
+# to align with Module C (Summary) contract: exacerbating + relieving
 SOCRATES_QUESTIONS = [
     ("site", "Where exactly do you feel it?"),
     ("onset", "When did it start, and did it come on suddenly or gradually?"),
@@ -51,7 +44,8 @@ SOCRATES_QUESTIONS = [
     ("radiation", "Does it spread anywhere else?"),
     ("associated_symptoms", "Are you having any other symptoms along with this?"),
     ("timing", "Is it constant, or does it come and go?"),
-    ("exacerbating_relieving", "Does anything make it better or worse?"),
+    ("exacerbating", "Does anything make it worse?"),
+    ("relieving", "Does anything make it better?"),
     ("severity", "On a scale of 1 to 10, how severe is it?"),
 ]
 
@@ -91,20 +85,21 @@ class HistorySession:
     ayush_mode: bool = False
     state: SessionState = SessionState.START
     chief_complaint: str = ""
-    hpi: Dict[str, str] = field(default_factory=dict)
-    past_medical_history: List[str] = field(default_factory=list)
-    drug_allergy_history: List[str] = field(default_factory=list)
-    family_history: List[str] = field(default_factory=list)
-    personal_history: Dict[str, str] = field(default_factory=dict)
-    review_of_systems: Dict[str, str] = field(default_factory=dict)
-    ayush: Dict[str, str] = field(default_factory=dict)
-    red_flags_triggered: List[Dict] = field(default_factory=list)
+    hpi: dict[str, str] = field(default_factory=dict)
+    past_medical_history: list[str] = field(default_factory=list)
+    drug_allergy_history: list[str] = field(default_factory=list)
+    family_history: list[str] = field(default_factory=list)
+    personal_history: dict[str, str] = field(default_factory=dict)
+    review_of_systems: dict[str, str] = field(default_factory=dict)
+    ayush: dict[str, str] = field(default_factory=dict)
+    red_flags_triggered: list[dict] = field(default_factory=list)
     _socrates_idx: int = 0
     _ros_idx: int = 0
     _dashavidha_idx: int = 0
-    _raw_answers: List[str] = field(default_factory=list)
+    _raw_answers: list[str] = field(default_factory=list)
+    patient_id: str | None = None  # Link to patient for persistence
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Data contract consumed by Module C (Summary Generator) — see
         docs/module-A-conversation-engine.md."""
         return {
@@ -129,12 +124,12 @@ class DialogueManager:
     of a plain dict, so a patient can resume after stepping away (e.g. to scan
     documents in Module B) — swap `self.sessions` for a DB-backed repository."""
 
-    def __init__(self, redflag_detector: Optional[RedFlagDetector] = None):
-        self.sessions: Dict[str, HistorySession] = {}
+    def __init__(self, redflag_detector: RedFlagDetector | None = None):
+        self.sessions: dict[str, HistorySession] = {}
         self.redflag_detector = redflag_detector or RedFlagDetector()
 
     # ---- session lifecycle -------------------------------------------------
-    def start_session(self, language: str, ayush_mode: bool = False) -> Dict:
+    def start_session(self, language: str, ayush_mode: bool = False) -> dict:
         session_id = str(uuid.uuid4())
         session = HistorySession(
             session_id=session_id,
@@ -152,7 +147,7 @@ class DialogueManager:
         return self.sessions[session_id]
 
     # ---- core turn handler ---------------------------------------------------
-    def submit_answer(self, session_id: str, question_id: str, answer_text: str) -> Dict:
+    def submit_answer(self, session_id: str, question_id: str, answer_text: str) -> dict:
         session = self.get_session(session_id)
         if session.state == SessionState.COMPLETE:
             raise ValueError(f"Session {session_id} is already complete")
@@ -199,7 +194,7 @@ class DialogueManager:
         elif session.state == SessionState.DASHAVIDHA_PARIKSHA:
             session.ayush[question_id] = answer_text
 
-    def _advance(self, session: HistorySession) -> Optional[Question]:
+    def _advance(self, session: HistorySession) -> Question | None:
         if session.state == SessionState.CHIEF_COMPLAINT:
             session.state = SessionState.HPI_LOOP
             session._socrates_idx = 0
@@ -249,21 +244,21 @@ class DialogueManager:
 
         return None
 
-    def _next_socrates_question(self, session: HistorySession) -> Optional[Question]:
+    def _next_socrates_question(self, session: HistorySession) -> Question | None:
         if session._socrates_idx >= len(SOCRATES_QUESTIONS):
             return None
         qid, prompt = SOCRATES_QUESTIONS[session._socrates_idx]
         session._socrates_idx += 1
         return Question(qid, prompt, SessionState.HPI_LOOP)
 
-    def _next_ros_question(self, session: HistorySession) -> Optional[Question]:
+    def _next_ros_question(self, session: HistorySession) -> Question | None:
         if session._ros_idx >= len(ROS_SYSTEMS):
             return None
         system = ROS_SYSTEMS[session._ros_idx]
         session._ros_idx += 1
         return Question(system, f"Any issues with your {system} system (relevant symptoms)?", SessionState.ROS)
 
-    def _next_dashavidha_question(self, session: HistorySession) -> Optional[Question]:
+    def _next_dashavidha_question(self, session: HistorySession) -> Question | None:
         if session._dashavidha_idx >= len(DASHAVIDHA_PARIKSHA_QUESTIONS):
             return None
         qid, prompt = DASHAVIDHA_PARIKSHA_QUESTIONS[session._dashavidha_idx]

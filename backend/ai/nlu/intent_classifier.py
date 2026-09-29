@@ -4,8 +4,7 @@ Owner    : ML Engineer
 Purpose  : Classifies patient utterances into clinical intents.
 """
 
-from backend.ai.common import MockLLMClient, get_prompt, parse_llm_json, detect_language
-
+from backend.ai.common import MockLLMClient, detect_language, get_prompt, parse_llm_json
 
 VALID_INTENTS = {
     "symptom_report",

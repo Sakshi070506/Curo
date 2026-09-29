@@ -3,23 +3,24 @@ Tests for backend.ai.nlu module.
 """
 
 import pytest
+
 from backend.ai.nlu import (
-    SOCRATES_TREE,
-    DASHAVIDHA_PARIKSHA,
     AHARA_VIHARA_QUESTIONS,
-    ROS_CHECKLIST,
     CONCEPT_TO_ICD_SNOMED,
-    get_socrates_tree,
-    get_next_question,
-    get_ayush_questions,
-    get_ahara_vihara_questions,
-    get_ros_questions,
-    get_icd_snomed,
-    classify_intent_sync,
-    VALID_INTENTS,
-    extract_entities_sync,
-    merge_tapped_answer,
+    DASHAVIDHA_PARIKSHA,
+    ROS_CHECKLIST,
     SOCRATES_SLOTS,
+    SOCRATES_TREE,
+    VALID_INTENTS,
+    classify_intent_sync,
+    extract_entities_sync,
+    get_ahara_vihara_questions,
+    get_ayush_questions,
+    get_icd_snomed,
+    get_next_question,
+    get_ros_questions,
+    get_socrates_tree,
+    merge_tapped_answer,
 )
 
 

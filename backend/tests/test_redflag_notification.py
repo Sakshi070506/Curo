@@ -1,5 +1,5 @@
-from services.redflag_service import RedFlagDetector, build_triage_alert_payload
-from services.notification_service import NotificationService, InMemoryDashboardChannel
+from backend.services.notification_service import InMemoryDashboardChannel, NotificationService
+from backend.services.redflag_service import RedFlagDetector, build_triage_alert_payload
 
 
 # ---------------------------------------------------------------------------

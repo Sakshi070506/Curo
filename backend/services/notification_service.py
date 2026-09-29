@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Protocol
+from typing import Protocol
 
 
 @dataclass
@@ -26,9 +27,12 @@ class TriageAlert:
     patient_id: str
     session_id: str
     severity: str
-    matched_rules: List[Dict]
+    matched_rules: list[dict]
     created_at: float
     acknowledged: bool = False
+    requires_immediate_attention: bool = False
+    symptom: str = ""
+    timestamp: str = ""
 
 
 class DashboardChannel(Protocol):
@@ -41,8 +45,8 @@ class InMemoryDashboardChannel:
     websocket handler (via subscribe callbacks) — same underlying queue."""
 
     def __init__(self):
-        self._queue: List[TriageAlert] = []
-        self._subscribers: List[Callable[[TriageAlert], None]] = []
+        self._queue: list[TriageAlert] = []
+        self._subscribers: list[Callable[[TriageAlert], None]] = []
 
     def publish(self, alert: TriageAlert) -> None:
         self._queue.append(alert)
@@ -52,7 +56,7 @@ class InMemoryDashboardChannel:
     def subscribe(self, callback: Callable[[TriageAlert], None]) -> None:
         self._subscribers.append(callback)
 
-    def pending(self) -> List[TriageAlert]:
+    def pending(self) -> list[TriageAlert]:
         return [a for a in self._queue if not a.acknowledged]
 
     def acknowledge(self, alert_id: str) -> bool:
@@ -72,7 +76,7 @@ class NoOpSMSProvider:
     tests can assert on `sent_log` without any telecom API integration."""
 
     def __init__(self):
-        self.sent_log: List[Dict[str, str]] = []
+        self.sent_log: list[dict[str, str]] = []
 
     def send(self, to: str, message: str) -> bool:
         self.sent_log.append({"to": to, "message": message})
@@ -82,9 +86,9 @@ class NoOpSMSProvider:
 class NotificationService:
     def __init__(
         self,
-        dashboard_channel: Optional[DashboardChannel] = None,
-        sms_provider: Optional[SMSProvider] = None,
-        sms_escalation_numbers: Optional[List[str]] = None,
+        dashboard_channel: DashboardChannel | None = None,
+        sms_provider: SMSProvider | None = None,
+        sms_escalation_numbers: list[str] | None = None,
     ):
         self.dashboard_channel = dashboard_channel or InMemoryDashboardChannel()
         self.sms_provider = sms_provider or NoOpSMSProvider()
@@ -95,8 +99,13 @@ class NotificationService:
         patient_id: str,
         session_id: str,
         severity: str,
-        matched_rules: List[Dict],
+        matched_rules: list[dict],
+        requires_immediate_attention: bool | None = None,
+        symptom: str = "",
+        timestamp: str = "",
     ) -> TriageAlert:
+        if requires_immediate_attention is None:
+            requires_immediate_attention = severity == "critical"
         alert = TriageAlert(
             id=str(uuid.uuid4()),
             patient_id=patient_id,
@@ -104,10 +113,13 @@ class NotificationService:
             severity=severity,
             matched_rules=matched_rules,
             created_at=time.time(),
+            requires_immediate_attention=requires_immediate_attention,
+            symptom=symptom,
+            timestamp=timestamp,
         )
         self.dashboard_channel.publish(alert)
 
-        if severity == "critical":
+        if requires_immediate_attention:
             self._escalate_sms(alert)
 
         return alert
@@ -121,7 +133,7 @@ class NotificationService:
         for number in self.sms_escalation_numbers:
             self.sms_provider.send(number, message)
 
-    def get_queue(self) -> List[TriageAlert]:
+    def get_queue(self) -> list[TriageAlert]:
         if hasattr(self.dashboard_channel, "pending"):
             return self.dashboard_channel.pending()
         return []
@@ -137,6 +149,9 @@ if __name__ == "__main__":
     alert = svc.push_triage_alert(
         "p123", "s456", "critical",
         [{"id": "acute_coronary_syndrome", "description": "Chest pain with breathlessness", "severity": "critical"}],
+        requires_immediate_attention=True,
+        symptom="Chest pain with breathlessness — possible cardiac event",
+        timestamp="2026-01-01T00:00:00Z",
     )
     print("Queued:", svc.get_queue())
     print("SMS log:", svc.sms_provider.sent_log)

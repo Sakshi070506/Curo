@@ -5,11 +5,9 @@ Purpose  : Provider-agnostic LLM client with mock for dev.
 """
 
 import os
-import httpx
-from typing import Any
 from dataclasses import dataclass
 
-from .prompts import PROMPT_TASKS
+import httpx
 
 
 @dataclass
@@ -139,6 +137,20 @@ class MockLLMClient:
         task: str | None = None,
         **kwargs,
     ) -> dict:
+        if task and task in self._RESPONSES:
+            import json
+            return json.dumps(self._RESPONSES[task])
+        return "{}"
+
+    def chat_sync(
+        self,
+        messages: list[dict],
+        temperature: float = 0.2,
+        max_tokens: int = 2048,
+        task: str | None = None,
+        **kwargs,
+    ) -> dict:
+        """Synchronous version of chat for use in sync contexts."""
         if task and task in self._RESPONSES:
             import json
             return json.dumps(self._RESPONSES[task])

@@ -4,6 +4,12 @@ Owner    : ML Engineer / Summary LLM Engineer
 Purpose  : Central exports for prompts, utils, and LLM client.
 """
 
+from .client import (
+    LLMClient,
+    LLMConfig,
+    MockLLMClient,
+    get_client,
+)
 from .prompts import (
     PROMPT_TASKS,
     PromptSpec,
@@ -16,12 +22,6 @@ from .utils import (
     detect_language,
     log_llm,
     parse_llm_json,
-)
-from .client import (
-    LLMConfig,
-    LLMClient,
-    MockLLMClient,
-    get_client,
 )
 
 __all__ = [

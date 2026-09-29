@@ -1,6 +1,7 @@
 import pytest
-from services.dialogue_manager import DialogueManager, SessionState
-from services.redflag_service import RedFlagDetector
+
+from backend.services.dialogue_manager import DialogueManager, SessionState
+from backend.services.redflag_service import RedFlagDetector
 
 
 def test_start_session_returns_chief_complaint_question():
@@ -32,7 +33,8 @@ def test_full_routine_interview_reaches_complete():
     session = dm.get_session(sid)
     assert session.state == SessionState.COMPLETE
     assert session.chief_complaint == "mild headache"
-    assert len(session.hpi) == 8  # all SOCRATES slots filled
+    # Updated: 9 SOCRATES slots (exacerbating and relieving are now separate)
+    assert len(session.hpi) == 9
     assert len(session.review_of_systems) == 6  # all ROS systems asked
 
 
